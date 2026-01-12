@@ -76,11 +76,12 @@ export default function TaskForm({ open, onClose, onSubmit, existingTitles, init
       priority: ((priority || 'Medium') as Priority),
       status: ((status || 'Todo') as Status),
       notes: notes.trim() || undefined,
-      ...(initial ? { id: initial.id } : {}),
+      ...(initial ? { id: initial.id, createdAt: initial.createdAt } : { createdAt: new Date().toISOString() }),
     };
     onSubmit(payload);
     onClose();
   };
+
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">

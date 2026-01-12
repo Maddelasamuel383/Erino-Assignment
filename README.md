@@ -18,28 +18,21 @@ This README documents recent bug fixes applied to the project and includes quick
 - [src/components/TaskTable.tsx](src/components/TaskTable.tsx): Stop `event` propagation on Edit/Delete buttons; render notes as plain text; ROI formatting.
 - [src/components/MetricsBar.tsx](src/components/MetricsBar.tsx): 2-decimal formatting for metrics.
 
-**How to verify (manual)**
-1. Start the dev server (example):
+**Netlify / Build fixes applied**
+- **Added Node types**: `@types/node` was added to `devDependencies` so TypeScript can resolve Node builtins during the build.
+- **tsconfig updates**: `moduleResolution` changed to `node` and `types` now include `node` and `vite/client`. `tsconfig.node.json` also includes `types: ["node"]` for `vite.config.ts` compilation.
+- **vite.config.ts (ESM-safe)**: Replaced `node:path` and `__dirname` usage with `import path from 'path'` + `fileURLToPath(import.meta.url)` to compute `__dirname` in ESM.
+- **TaskForm createdAt**: `createdAt` is now provided for newly created tasks (and preserved on edit) so the `Task` type requirement is satisfied during `tsc` builds.
 
-```bash
-npm run dev
-```
+**Files changed for build fixes**
+- [package.json](package.json): added `@types/node` to `devDependencies`.
+- [tsconfig.json](tsconfig.json): switched `moduleResolution` to `node` and added `types`.
+- [tsconfig.node.json](tsconfig.node.json): added `types: ["node"]` and set `moduleResolution` to `node` for vite config compilation.
+- [vite.config.ts](vite.config.ts): use ESM-safe `__dirname` pattern (`fileURLToPath(import.meta.url)`) and import `path` normally.
+- [src/components/TaskForm.tsx](src/components/TaskForm.tsx): include `createdAt` when creating new tasks.
 
-2. Open the app in a browser and watch the dev console while refreshing:
-- Confirm the tasks fetch runs exactly once on page load (no duplicate network calls).
 
-3. Delete a task and observe the Snackbar:
-- Click `Delete` on a task — the snackbar should appear and `Undo` should restore that task.
-- If you close the snackbar (auto-hide or manual close), clicking `Undo` afterwards should do nothing.
 
-4. Check sorting stability:
-- Create or modify tasks so two items share the same ROI and priority. They should remain in the same order across re-renders.
 
-5. Check ROI display and edge cases:
-- Tasks with `timeTaken` = 0 or invalid revenue show `N/A` for ROI (no Infinity/NaN).
-- ROI and Revenue/Hour should display with two decimals.
 
-If you want, I can run the dev server in the terminal and show logs or run a TypeScript build to confirm there are no type errors.
 
----
-If you'd like this committed to a branch or pushed, tell me the preferred commit message and remote branch.
