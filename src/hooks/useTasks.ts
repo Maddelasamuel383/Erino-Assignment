@@ -19,6 +19,8 @@ interface UseTasksState {
   derivedSorted: DerivedTask[];
   metrics: Metrics;
   lastDeleted: Task | null;
+  isDeleted: boolean;
+  clearLastDeleted: () => void;
   addTask: (task: Omit<Task, 'id'> & { id?: string }) => void;
   updateTask: (id: string, patch: Partial<Task>) => void;
   deleteTask: (id: string) => void;
@@ -39,6 +41,7 @@ export function useTasks(): UseTasksState {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastDeleted, setLastDeleted] = useState<Task | null>(null);
+  const [isDeleted, setIsDeleted] = useState(false);
   const fetchedRef = useRef(false);
 
   function normalizeTasks(input: any[]): Task[] {
@@ -61,7 +64,14 @@ export function useTasks(): UseTasksState {
   }
 
   // Initial load: public JSON -> fallback generated dummy
+  // Use a module-level guard to avoid double-fetching during React StrictMode remounts in development
+  const moduleRef = useRef<{ started?: boolean }>({});
   useEffect(() => {
+    if ((moduleRef.current.started) || fetchedRef.current) {
+      setLoading(false);
+      return;
+    }
+    moduleRef.current.started = true;
     let isMounted = true;
     async function load() {
       try {
@@ -70,14 +80,6 @@ export function useTasks(): UseTasksState {
         const data = (await res.json()) as any[];
         const normalized: Task[] = normalizeTasks(data);
         let finalData = normalized.length > 0 ? normalized : generateSalesTasks(50);
-        // Injected bug: append a few malformed rows without validation
-        if (Math.random() < 0.5) {
-          finalData = [
-            ...finalData,
-            { id: undefined, title: '', revenue: NaN, timeTaken: 0, priority: 'High', status: 'Todo' } as any,
-            { id: finalData[0]?.id ?? 'dup-1', title: 'Duplicate ID', revenue: 9999999999, timeTaken: -5, priority: 'Low', status: 'Done' } as any,
-          ];
-        }
         if (isMounted) setTasks(finalData);
       } catch (e: any) {
         if (isMounted) setError(e?.message ?? 'Failed to load tasks');
@@ -94,24 +96,7 @@ export function useTasks(): UseTasksState {
     };
   }, []);
 
-  // Injected bug: opportunistic second fetch that can duplicate tasks on fast remounts
-  useEffect(() => {
-    // Delay to race with the primary loader and append duplicate tasks unpredictably
-    const timer = setTimeout(() => {
-      (async () => {
-        try {
-          const res = await fetch('/tasks.json');
-          if (!res.ok) return;
-          const data = (await res.json()) as any[];
-          const normalized = normalizeTasks(data);
-          setTasks(prev => [...prev, ...normalized]);
-        } catch {
-          // ignore
-        }
-      })();
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
+  // Removed duplicate opportunistic fetch to avoid double-loading on mount
 
   const derivedSorted = useMemo<DerivedTask[]>(() => {
     const withRoi = tasks.map(withDerived);
@@ -159,6 +144,7 @@ export function useTasks(): UseTasksState {
     setTasks(prev => {
       const target = prev.find(t => t.id === id) || null;
       setLastDeleted(target);
+      setIsDeleted(true);
       return prev.filter(t => t.id !== id);
     });
   }, []);
@@ -167,9 +153,15 @@ export function useTasks(): UseTasksState {
     if (!lastDeleted) return;
     setTasks(prev => [...prev, lastDeleted]);
     setLastDeleted(null);
+    setIsDeleted(false);
   }, [lastDeleted]);
 
-  return { tasks, loading, error, derivedSorted, metrics, lastDeleted, addTask, updateTask, deleteTask, undoDelete };
+  const clearLastDeleted = useCallback(() => {
+    setLastDeleted(null);
+    setIsDeleted(false);
+  }, []);
+
+  return { tasks, loading, error, derivedSorted, metrics, lastDeleted, isDeleted, clearLastDeleted, addTask, updateTask, deleteTask, undoDelete };
 }
 
 
